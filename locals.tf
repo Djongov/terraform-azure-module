@@ -2,7 +2,8 @@ locals {
     common_tags = merge({
             "managed-by" = "terraform",
             "environment" = var.environment,
-            "project" = var.project_name
+            "project" = var.project_name,
+            "workspace" = terraform.workspace
         },
         var.common_tags
     )

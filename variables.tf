@@ -23,3 +23,40 @@ variable "common_tags" {
   type    = map(string)
   default = {}
 }
+
+variable "storage_accounts" {
+  type = map(
+    object(
+      {
+        name                            = optional(string) # Overrides default naming
+        resource_group_name             = optional(string) # Deploys in different than the module's resource group
+        location                        = optional(string) # Overrides default location from var.location
+        account_tier                    = optional(string) # Standard and Premium. For BlockBlobStorage and FileStorage accounts only Premium is valid
+        account_kind                    = optional(string) # BlobStorage, BlockBlobStorage, FileStorage, Storage and StorageV2. Defaults to StorageV2
+        account_replication_type        = optional(string) # Valid options are LRS, GRS, RAGRS, ZRS, GZRS and RAGZRS. Defaults to LRS
+        access_tier                     = optional(string) # Defines the access tier for BlobStorage, FileStorage and StorageV2 accounts. Valid options are Hot, Cool, Cold and Premium. Defaults to Hot.
+        allow_nested_items_to_be_public = optional(bool)
+        containers = optional(map(object({
+          access_type = string
+          metadata    = optional(map(string))
+        })))
+        file_shares = optional(map(object({
+          metadata = optional(map(string))
+          quota    = optional(number)
+        })))
+        tables = optional(map(object({
+          metadata = optional(map(string))
+        })))
+        queues = optional(map(object({
+          metadata = optional(map(string))
+        })))
+        private_endpoint = optional(object({
+          endpoint_type        = string
+          subnet_id            = string
+          private_dns_zone_ids = list(string)
+        }))
+        tags = optional(map(string))
+      }
+  ))
+  default = {}
+}
