@@ -107,9 +107,9 @@ resource "azurerm_storage_queue" "this" {
     if local.flattened_queues != null
   }
 
-  name                 = each.value.name
-  storage_account_id   = azurerm_storage_account.this[each.value.storage_account].id
-  metadata             = each.value.metadata != null ? each.value.metadata : {}
+  name               = each.value.name
+  storage_account_id = azurerm_storage_account.this[each.value.storage_account].id
+  metadata           = each.value.metadata != null ? each.value.metadata : {}
 }
 
 # Tables

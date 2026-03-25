@@ -1,14 +1,14 @@
 locals {
-    common_tags = merge({
-            "managed-by" = "terraform",
-            "environment" = var.environment,
-            "project" = var.project_name,
-            "workspace" = terraform.workspace
-        },
-        var.common_tags
-    )
+  common_tags = merge({
+    "managed-by"  = "terraform",
+    "environment" = var.environment,
+    "project"     = var.project_name,
+    "workspace"   = terraform.workspace
+    },
+    var.common_tags
+  )
 
-    location_abbreviations = {
+  location_abbreviations = {
     # Europe
     "West Europe"          = "we"
     "westeurope"           = "we"
