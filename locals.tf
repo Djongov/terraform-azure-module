@@ -3,7 +3,8 @@ locals {
     "managed-by"  = "terraform",
     "environment" = var.environment,
     "project"     = var.project_name,
-    "workspace"   = terraform.workspace
+    "workspace"   = terraform.workspace,
+    "last-modified-in-terraform-by" = data.azurerm_client_config.current.object_id
     },
     var.common_tags
   )

@@ -251,7 +251,7 @@ resource "azurerm_user_assigned_identity" "pg" {
 #     k if(v.subnet_key != null || v.subnet_id != null) && local.postgresql_private_endpoint_subnet_ids[k] != null
 #   ]) > 0 && var.vnet != null ? 1 : 0
 
-#   name                  = "${var.application_name}-${var.environment}-postgres-vnet-link"
+#   name                  = "${var.project_name}-${var.environment}-postgres-vnet-link"
 #   resource_group_name   = data.azurerm_private_dns_zone.postgres[0].resource_group_name # For some reason, the vnet link should be in the private DNS zone RG and not in the RG of the VNET. Go figure...
 #   private_dns_zone_name = data.azurerm_private_dns_zone.postgres[0].name
 #   virtual_network_id    = azurerm_virtual_network.this[0].id != null ? azurerm_virtual_network.this[0].id : data.azurerm_virtual_network.postgres_vnet[0].id

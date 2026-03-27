@@ -213,3 +213,251 @@ variable "postgresql_flexible_servers" {
   )
   default = {}
 }
+
+variable "app_service_certificates" {
+  type = map(object({
+    dns_name          = string           # Must be in "CN=example.com" format
+    product_type      = string           # Possible values are Standard or WildCard
+    auto_renew        = optional(bool)   # Default to true
+    key_size          = optional(number) # Default to 2048
+    validity_in_years = optional(number) # Default to 1, 1 or 3
+  }))
+  default = {}
+}
+
+variable "app_service_plans" {
+  type = map(object({
+    sku                      = string
+    os_type                  = string
+    worker_count             = optional(number)
+    key                      = optional(string)
+    name                     = optional(string)
+    location                 = optional(string)
+    tags                     = optional(map(string))
+    zone_balancing_enabled   = optional(bool)
+    per_site_scaling_enabled = optional(bool)
+  }))
+  default = {}
+}
+
+variable "webapp_ssl_certificates" {
+  type = object({
+    locations = map(map(object({
+      # If we want to pull a "certificate" type of secret from the key vault use this
+      certificate_name = optional(string)
+      # If we want to pull a "secret" type of secret from the key vault use this. This is recommended as it stays in sync with the actual App Service Certificate
+      secret_name = optional(string)
+      # The key vault ID
+      key_vault_id = string
+      tags         = optional(map(string))
+    })))
+  })
+  default = {
+    locations = {}
+  }
+}
+
+variable "web_apps" {
+  description = "This map is used to deploy Azure App Service web apps"
+  type = map(
+    object(
+      {
+        # ================ Custom params ================ #
+        # The key is optional and is used if we want to override the key naming convention
+        key = optional(string)
+        # The app service plan to attach to
+        app_service_plan = string
+        # Mount app settings from key vault. The key of the map is just a name to identify the configuration, and has no functional purpose.
+        app_settings_from_key_vault = optional(map(object({
+          # Each key will be a key vault reference, and a Key Vault Secrets User role will be created for the web app's managed identity on that key vault, and the secrets will be pulled from there. The value of the map is an object with the following properties:
+          # One of the two needs to be provided
+          key_vault_id  = optional(string) # this is if the key vault is in remote project
+          key_vault_key = optional(string) # this is if the key vault is local and we want to reference it by the key in the key vaults variable
+          app_settings  = map(string)      # this will be a map of app settings, keys are what the env var name should be, the values are the secret names in the key vault
+        })))
+        # The custom domains map of objects. Needs to point to the name of the certificate in the webapp_ssl_certificates map
+        custom_domains = optional(map(object({
+          key_vault_certificate           = optional(string)
+          app_service_managed_certificate = optional(bool)
+        })))
+        # =============== Standard params ================ #
+        # To completely override the name of the app service, used in imports or special cases
+        name = optional(string)
+        # The app settings
+        app_settings = map(string)
+        autoheal = optional(object({
+          action = object({
+            action_type                    = string # "Recycle", "Log", or "CustomAction"
+            minimum_process_execution_time = optional(string)
+          })
+          trigger = object({
+            # For now we only do status_code
+            count             = number
+            interval          = string
+            status_code_range = string # e.g. "400-499" or "500-599"
+            sub_status        = optional(number)
+            win32_status_code = optional(number) # e.g. 0, 1, 2, etc.
+            }
+        ) }))
+        alert_rules = optional(object({
+          resource_health = optional(object({
+            enabled         = bool
+            action_group_id = string
+          }))
+          container_failures = optional(object({
+            enabled         = bool
+            action_group_id = string
+          }))
+        }))
+        # enable/disable switch
+        enabled = optional(bool)
+        # https only switch
+        https_only = optional(bool)
+        # client affinity switch
+        client_affinity_enabled = optional(bool)
+        # client certificate enabled switch
+        ftp_publish_basic_authentication_enabled = optional(bool)
+        # vnet integraiton turns on by providing the vnet and subnet in the format #RG/VNET/Subnet
+        vnet_integration              = optional(string)
+        public_network_access_enabled = optional(bool)
+        # Whether to attach to the application insights
+        application_insights = optional(string)
+        # Site config
+        site_config = object({
+          always_on                               = optional(bool)
+          worker_count                            = optional(number)
+          ftps_state                              = optional(string)
+          http2_enabled                           = optional(bool)
+          health_check_path                       = optional(string)
+          health_check_eviction_time_in_min       = optional(number)
+          use_32_bit_worker_process               = optional(bool)
+          ip_restriction_default_action           = optional(string)
+          scm_ip_restriction_default_action       = optional(string)
+          vnet_route_all_enabled                  = optional(bool)
+          websockets_enabled                      = optional(bool)
+          app_command_line                        = optional(string)
+          container_registry_use_managed_identity = optional(bool)
+          //scm_type                                = optional(string)
+          use_32_bit_worker   = optional(bool)
+          local_mysql_enabled = optional(bool)
+          cors = optional(object({
+            allowed_origins     = list(string)
+            support_credentials = optional(bool)
+          }))
+          virtual_applications = optional(list(object({
+            physical_path = string
+            preload       = bool
+            virtual_path  = string
+          })))
+        })
+        # Identity
+        identity = optional(object({
+          type         = string                 # "SystemAssigned", "UserAssigned", or "SystemAssigned, UserAssigned"
+          identity_ids = optional(list(string)) # Required if UserAssigned is included
+        }))
+        # Application stack
+        application_stack = object({
+          # If deploying code
+          php_version         = optional(string)
+          java_version        = optional(string)
+          node_version        = optional(string)
+          python_version      = optional(string)
+          dotnet_version      = optional(string)
+          ruby_version        = optional(string)
+          dotnet_core_version = optional(string)
+          # If mounting an image from a container registry
+          docker_image_name     = optional(string)
+          docker_registry_url   = optional(string)
+          docker_image          = optional(string)
+          docker_image_tag      = optional(string)
+          continuous_deployment = optional(bool)
+        })
+        source_control = optional(object({
+          repo_url               = string
+          branch                 = optional(string)
+          use_manual_integration = optional(bool)
+          type                   = optional(string) # Possible values are "GitHub", "Bitbucket", "ExternalGit", "LocalGit", "OneDrive", "Dropbox", "AzureDevOps"
+          token = optional(object({
+            type                     = string # Possible values are "GitHub", "AzureDevOps", "Bitbucket", "GitLab"
+            key_vault_name           = string
+            key_vault_resource_group = string
+            secret_name              = string
+          }))
+          github_action_configuration = optional(object({
+            generate_workflow_file = optional(bool, false)
+            container_configuration = optional(object({
+              image_name   = string
+              registry_url = string
+            }))
+          }))
+        }))
+        # App Service Logs
+        logs = optional(object(
+          {
+            detailed_error_messages = optional(bool)
+            failed_request_tracing  = optional(bool)
+            http_logs = optional(object({
+              azure_blob_storage = optional(object({
+                retention_in_days = optional(number) # 0 means no retention
+                sas_url           = string
+              }))
+              file_system = optional(object({
+                retention_in_days = number
+                retention_in_mb   = number
+              }))
+            }))
+            application_logs = optional(object(
+              {
+                azure_blob_storage = optional(object(
+                  {
+                    level             = string # Possible values include Error, Warning, Information, Verbose and Off
+                    retention_in_days = number
+                    sas_url           = string
+                  }
+                ))
+                file_system_level = string # Possible values include: Off, Verbose, Information, Warning, and Error.
+              }
+            ))
+          }
+        ))
+        # Diagnostic settings
+        diagnostic_settings = optional(map(object({
+          name                           = optional(string)
+          log_analytics_workspace_id     = optional(string)
+          storage_account_id             = optional(string)
+          eventhub_namespace             = optional(string)
+          eventhub_authorization_rule_id = optional(string)
+          log_categories = object({
+            AppServiceHTTPLogs       = optional(bool)
+            AppServiceConsoleLogs    = optional(bool)
+            AppServiceAppLogs        = optional(bool) # Only for ASP.NET (Windows) and Java SE & Tomcat (Linux)
+            AppServiceAuditLogs      = optional(bool)
+            AppServicePlatformLogs   = optional(bool)
+            AppServiceIPSecAuditLogs = optional(bool)
+            AllMetrics               = optional(bool)
+          })
+        })))
+        # Creates a priority 100 rule to allow traffic from the Front Door id only
+        allow_front_door_access_restriction_front_door_id = optional(string)
+        # A list of custom defined IP restrictions
+        custom_ip_restrictions = optional(list(object({
+          name                      = string
+          action                    = string
+          priority                  = number
+          ip_address                = optional(string)
+          service_tag               = optional(string)
+          description               = optional(string)
+          virtual_network_subnet_id = optional(string)
+          headers = optional(list(object({
+            x_azure_fdid      = list(string)
+            x_fd_health_probe = list(string)
+            x_forwarded_for   = list(string)
+            x_forwarded_host  = list(string)
+          })))
+        })))
+        tags = optional(map(string))
+      }
+    )
+  )
+  default = {}
+}
