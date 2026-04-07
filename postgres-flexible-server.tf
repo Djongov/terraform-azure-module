@@ -24,27 +24,27 @@ locals {
   ])
 
   # Map each PostgreSQL server to its referenced web app's outbound IPs
-  # postgresql_webapp_firewall_rules = {
-  #   for postgresql_key, postgresql_val in var.postgresql_flexible_servers != null ? var.postgresql_flexible_servers : {} :
-  #   postgresql_key => {
-  #     webapp_key = postgresql_val.allow_firewall_webapp
-  #     ips        = lookup(azurerm_linux_web_app.this[postgresql_val.allow_firewall_webapp], "possible_outbound_ip_address_list", [])
-  #   }
-  #   if postgresql_val.allow_firewall_webapp != null
-  # }
+  postgresql_webapp_firewall_rules = {
+    for postgresql_key, postgresql_val in var.postgresql_flexible_servers != null ? var.postgresql_flexible_servers : {} :
+    postgresql_key => {
+      webapp_key = postgresql_val.allow_firewall_webapp
+      ips        = lookup(azurerm_linux_web_app.this[postgresql_val.allow_firewall_webapp], "possible_outbound_ip_address_list", [])
+    }
+    if postgresql_val.allow_firewall_webapp != null
+  }
 
   # # Flattened webapp firewall rules for PostgreSQL
-  # postgresql_webapp_firewall_rule_map = {
-  #   for rule in flatten([
-  #     for postgresql_key, info in local.postgresql_webapp_firewall_rules : [
-  #       for ip in info.ips : {
-  #         webapp_key     = info.webapp_key
-  #         postgresql_key = postgresql_key
-  #         ip             = ip
-  #       }
-  #     ]
-  #   ]) : "Allow-WebApp-${rule.webapp_key}-${replace(rule.ip, ".", "-")}" => rule
-  # }
+  postgresql_webapp_firewall_rule_map = {
+    for rule in flatten([
+      for postgresql_key, info in local.postgresql_webapp_firewall_rules : [
+        for ip in info.ips : {
+          webapp_key     = info.webapp_key
+          postgresql_key = postgresql_key
+          ip             = ip
+        }
+      ]
+    ]) : "allow-webapp-${rule.webapp_key}-${replace(rule.ip, ".", "-")}" => rule
+  }
 
   # Map PostgreSQL servers to their private endpoint subnet IDs
   # postgresql_private_endpoint_subnet_ids = {
@@ -283,16 +283,16 @@ resource "azurerm_postgresql_flexible_server_firewall_rule" "this" {
 }
 
 # PostgreSQL Flexible Server Firewall Rules for Web Apps
-# resource "azurerm_postgresql_flexible_server_firewall_rule" "webapp" {
-#   for_each = local.postgresql_webapp_firewall_rule_map
+resource "azurerm_postgresql_flexible_server_firewall_rule" "linux_webapp" {
+  for_each = local.postgresql_webapp_firewall_rule_map
 
-#   name             = each.key
-#   server_id        = azurerm_postgresql_flexible_server.this[each.value.postgresql_key].id
-#   start_ip_address = each.value.ip
-#   end_ip_address   = each.value.ip
+  name             = each.key
+  server_id        = azurerm_postgresql_flexible_server.this[each.value.postgresql_key].id
+  start_ip_address = each.value.ip
+  end_ip_address   = each.value.ip
 
-#   depends_on = [azurerm_linux_web_app.this]
-# }
+  depends_on = [azurerm_linux_web_app.this]
+}
 
 # PostgreSQL Monitoring Diagnostic Settings
 resource "azurerm_monitor_diagnostic_setting" "postgresql_diagnostic" {
