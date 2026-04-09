@@ -368,8 +368,8 @@ variable "web_apps" {
           # If mounting an image from a container registry
           docker_image_name     = optional(string)
           docker_registry_url   = optional(string)
-          docker_image          = optional(string)
-          docker_image_tag      = optional(string)
+          acr_id                = optional(string) # Full ARM resource ID of the ACR. Used for webhook, acrpull role assignment, and the hidden-link tag
+          acr_location          = optional(string) # Required when the ACR is in a different subscription; skips the data source lookup and uses this location for the webhook
           continuous_deployment = optional(bool)
         })
         source_control = optional(object({

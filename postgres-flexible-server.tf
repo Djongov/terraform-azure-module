@@ -28,7 +28,7 @@ locals {
     for postgresql_key, postgresql_val in var.postgresql_flexible_servers != null ? var.postgresql_flexible_servers : {} :
     postgresql_key => {
       webapp_key = postgresql_val.allow_firewall_webapp
-      ips        = lookup(azurerm_linux_web_app.this[postgresql_val.allow_firewall_webapp], "possible_outbound_ip_address_list", [])
+      ips        = lookup(azurerm_linux_web_app.this[postgresql_val.allow_firewall_webapp], "outbound_ip_address_list", [])
     }
     if postgresql_val.allow_firewall_webapp != null
   }

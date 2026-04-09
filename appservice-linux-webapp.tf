@@ -365,9 +365,9 @@ resource "azurerm_linux_web_app" "this" {
       "frontdoor" = "false",
       "hardened"  = "false"
     },
-    # lookup(each.value.application_stack, "continuous_deployment", null) == true ? {
-    #   "hidden-link: acrResourceId" = jsonencode({ subscriptionId = data.azurerm.xxxxxxxxx})
-    # } : {}
+    lookup(each.value.application_stack, "acr_id", null) != null ? {
+      "hidden-link: acrResourceId" = jsonencode({ subscriptionId = split("/", each.value.application_stack.acr_id)[2], resourceGroupName = split("/", each.value.application_stack.acr_id)[4], registryName = split("/", each.value.application_stack.acr_id)[8] })
+    } : {}
   )
 
   lifecycle {
@@ -651,42 +651,47 @@ resource "azurerm_app_service_source_control" "this" {
 
 
 # ACR hook and acr pull
-# resource "azurerm_container_registry_webhook" "linux_webapp_webhook" {
-#   for_each = var.web_apps != null && var.app_service_plans != null ? {
-#     for k, v in var.web_apps : k => v
-#     if lookup(var.app_service_plans, v.app_service_plan, null) != null &&
-#     var.app_service_plans[v.app_service_plan].os_type == "Linux" &&
-#     lookup(v.application_stack, "continuous_deployment", false) == true
-#   } : {}
+# Note: webhooks can only be created in the same subscription as the ACR.
+# When acr_location is set (cross-subscription ACR), the webhook is skipped here;
+# use the linux_web_app_acr_webhook_uris output to configure the webhook externally.
+resource "azurerm_container_registry_webhook" "linux_webapp_webhook" {
+  for_each = var.web_apps != null && var.app_service_plans != null ? {
+    for k, v in var.web_apps : k => v
+    if lookup(var.app_service_plans, v.app_service_plan, null) != null &&
+    var.app_service_plans[v.app_service_plan].os_type == "Linux" &&
+    lookup(v.application_stack, "continuous_deployment", false) == true &&
+    lookup(v.application_stack, "acr_id", null) != null &&
+    lookup(v.application_stack, "acr_location", null) == null
+  } : {}
 
-#   name                = "${replace(var.project_name, "-", "")}${replace(each.key, "-", "")}${var.environment}"
-#   location            = data.azurerm_container_registry.acr[each.key].location
-#   resource_group_name = data.azurerm_container_registry.acr[each.key].resource_group_name
-#   registry_name       = data.azurerm_container_registry.acr[each.key].name
-#   service_uri         = "https://${azurerm_linux_web_app.this[each.key].site_credential.0.name}:${azurerm_linux_web_app.this[each.key].site_credential.0.password}@${azurerm_linux_web_app.this[each.key].name}.scm.azurewebsites.net/api/registry/webhook" # Thanks to https://stackoverflow.com/questions/75307946/terraform-azure-how-to-get-deployment-webhook-url
-#   actions             = ["push"]
-#   scope               = each.value.application_stack["docker_image_name"] #"${split(":", each.value.application_stack["docker_image_name"])[0]}:*"
-# }
+  name                = "${replace(var.project_name, "-", "")}${replace(each.key, "-", "")}${var.environment}"
+  location            = each.value.application_stack.acr_location != null ? each.value.application_stack.acr_location : data.azurerm_container_registry.linux_webapp_acr[each.key].location
+  resource_group_name = split("/", each.value.application_stack.acr_id)[4]
+  registry_name       = split("/", each.value.application_stack.acr_id)[8]
+  service_uri         = "https://${azurerm_linux_web_app.this[each.key].site_credential.0.name}:${azurerm_linux_web_app.this[each.key].site_credential.0.password}@${azurerm_linux_web_app.this[each.key].name}.scm.azurewebsites.net/api/registry/webhook" # Thanks to https://stackoverflow.com/questions/75307946/terraform-azure-how-to-get-deployment-webhook-url
+  actions             = ["push"]
+  scope               = each.value.application_stack["docker_image_name"] #"${split(":", each.value.application_stack["docker_image_name"])[0]}:*"
+}
 
 
 # Now provide acr pull permissions to the web app if container_registry_use_managed_identity is true
-# resource "azurerm_role_assignment" "linux_webapp_acr_pull" {
-#   for_each = var.web_apps != null && var.app_service_plans != null ? {
-#     for k, v in var.web_apps : k => v
-#     if lookup(v.application_stack, "docker_registry_url", null) != null && 
-#     lookup(v.site_config, "container_registry_use_managed_identity", false) == true && 
-#     lookup(var.app_service_plans, v.app_service_plan, null) != null &&
-#     var.app_service_plans[v.app_service_plan].os_type == "Linux"
-#   } : {}
+resource "azurerm_role_assignment" "linux_webapp_acr_pull" {
+  for_each = var.web_apps != null && var.app_service_plans != null ? {
+    for k, v in var.web_apps : k => v
+    if lookup(v.application_stack, "acr_id", null) != null &&
+    lookup(v.site_config, "container_registry_use_managed_identity", false) == true &&
+    lookup(var.app_service_plans, v.app_service_plan, null) != null &&
+    var.app_service_plans[v.app_service_plan].os_type == "Linux"
+  } : {}
 
-#   scope                = data.azurerm_container_registry.acr[each.key].id
-#   role_definition_name = "AcrPull"
-#   principal_id         = azurerm_linux_web_app.this[each.key].identity[0].principal_id
+  scope                = each.value.application_stack.acr_id
+  role_definition_name = "AcrPull"
+  principal_id         = azurerm_linux_web_app.this[each.key].identity[0].principal_id
 
-#   depends_on = [
-#     azurerm_linux_web_app.this
-#   ]
-# }
+  depends_on = [
+    azurerm_linux_web_app.this
+  ]
+}
 
 resource "azurerm_monitor_activity_log_alert" "resource_health_alert" {
   for_each = var.web_apps != null ? {
