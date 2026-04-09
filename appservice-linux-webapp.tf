@@ -684,9 +684,10 @@ resource "azurerm_role_assignment" "linux_webapp_acr_pull" {
     var.app_service_plans[v.app_service_plan].os_type == "Linux"
   } : {}
 
-  scope                = each.value.application_stack.acr_id
-  role_definition_name = "AcrPull"
-  principal_id         = azurerm_linux_web_app.this[each.key].identity[0].principal_id
+  scope                            = each.value.application_stack.acr_id
+  role_definition_name             = "AcrPull"
+  principal_id                     = azurerm_linux_web_app.this[each.key].identity[0].principal_id
+  skip_service_principal_aad_check = true
 
   depends_on = [
     azurerm_linux_web_app.this
